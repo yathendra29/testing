@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="c8500ce6-b230-4364-90ad-2c2a4ddafbce" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="b3a5e8cb-976c-4079-b2cd-90ccf14864aa" >
+		<http:request-connection host="localhost" port="8081" />
+	</http:request-config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="e4d27f2f-7ed9-423e-be05-92a844414c9c" >
+		<db:my-sql-connection host="localhost" port="3306" user="root" password="Raghava$777" database="myfirstdb" />
+	</db:config>
+	<flow name="SAPI" doc:id="e81db5d0-6d2c-4caa-86bd-d4dea3b2dcc3" >
+		<http:listener doc:name="Listener" doc:id="f3e5181d-3372-4a60-bf0e-43f673ecc528" config-ref="HTTP_Listener_config" path="/papi"/>
+		<logger level="INFO" doc:name="Logger" doc:id="3baf3f3e-5eb0-4b53-b71d-e5f8271de435" message="#[payload]"/>
+		<set-variable value="#[attributes.queryParams.ID]" doc:name="Set Variable" doc:id="49ee6b1d-fa16-44d0-be4f-0a067ad01478" variableName="id"/>
+		<db:select doc:name="Select" doc:id="0d2ac62b-5bb7-4f6f-8b4f-c1dd2b5c7748" config-ref="Database_Config">
+			<db:sql ><![CDATA[select * from studentdetails where std_id = :id]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	"id":vars.id
+	}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="ad3e483a-4d86-4ef1-9773-8c81c6f1c586" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="227118bd-088c-4969-a2dc-d3bad8ecb56a" message="SAPI  ::::    #[payload]"/>
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="f9068571-fe6b-4591-a52d-3ed659c97a9f" type="ANY">
+				<logger level="INFO" doc:name="Logger" doc:id="744ed2ff-76ba-4f06-8d2b-7a1b46b3df8a" message="#[error.description]"/>
+				<ee:transform doc:name="Transform Message" doc:id="dc2b897b-92a4-4ad7-820c-e1e2c2088221" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"status":"Error"
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-continue>
+		</error-handler>
+	</flow>
+	<flow name="papiFlow" doc:id="52011cbf-b439-41a7-a799-5d00fb027f0f" >
+		<http:listener doc:name="Listener" doc:id="4a965636-1638-4f40-83f7-0c01b6d01084" config-ref="HTTP_Listener_config" path="/sapi"/>
+		<http:request method="GET" doc:name="Request" doc:id="cfb81cf3-4e1b-4985-b0e7-d9cb31bc4f7c" config-ref="HTTP_Request_configuration" path="/papi">
+			<http:query-params ><![CDATA[#[output application/java
+---
+{
+	"ID" : 402
+}]]]></http:query-params>
+		</http:request>
+		<logger level="INFO" doc:name="Logger" doc:id="242429c1-7b0d-4029-bc2b-3530571ac8c5" message="after request :::::   #[payload]"/>
+		<ee:transform doc:name="Transform Message" doc:id="69821c18-712c-49a2-8684-214e381ee6b9" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload map{
+    "hi":$.name
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<error-handler>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="32eb5310-d100-4004-b41f-522985d1c479" type="ANY">
+				<logger level="INFO" doc:name="Logger" doc:id="e902c048-066d-4817-aef5-08339221f031" message="#[error.description]"/>
+				<ee:transform doc:name="Transform Message" doc:id="deaef1ac-ef1f-4ac3-8dc1-edc97087a6d1" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"status":"Error on Propagate"
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+</mule>
